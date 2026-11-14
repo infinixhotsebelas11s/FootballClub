@@ -30,16 +30,31 @@ function makeRoster(clubName, save, allClubs) {
 }
 
 function goalNarrative(scorer, assister) {
-  const setup = assister
-    ? `${assister.name} mengirim umpan terobosan yang membelah pertahanan.`
-    : 'Serangan dibangun cepat dari lini tengah tanpa bantuan assist.';
-  const endings = [
-    `${setup} ${scorer.name} menyambut bola dengan tendangan melengkung ke sudut gawang.`,
-    `${setup} ${scorer.name} mengontrol bola, mengecoh penjaga, lalu menyelesaikannya dengan tenang.`,
-    `${setup} ${scorer.name} berlari ke ruang kosong dan melepaskan tembakan keras yang tak terjangkau kiper.`,
-    `${setup} Setelah sepak pojok lawan gagal, tim melancarkan serangan balik cepat; ${scorer.name} menuntaskannya dengan sepakan akurat.`,
+  const assisterName = assister?.name;
+  const scenarios = [
+    () => `${scorer.name} mengambil tendangan bebas dan mengirim bola melengkung melewati pagar hidup ke sudut gawang.`,
+    () => assisterName
+      ? `${assisterName} mengirim umpan silang ke kotak penalti, lalu ${scorer.name} memenangi duel udara dan menanduk bola ke gawang.`
+      : `${scorer.name} menyambut bola di kotak penalti dengan sundulan tajam yang tak mampu dijangkau kiper.`,
+    () => assisterName
+      ? `${assisterName} mengirim umpan terobosan. ${scorer.name} berlari ke ruang kosong, melewati tekanan bek, lalu menaklukkan kiper dalam situasi satu lawan satu.`
+      : `${scorer.name} merebut bola di depan kotak penalti, menggiringnya melewati penjagaan, lalu menuntaskan peluang dengan tenang.`,
+    () => assisterName
+      ? `Serangan balik cepat dimulai dari ${assisterName}, yang melepas umpan ke depan. ${scorer.name} menyelesaikannya dengan tembakan mendatar ke tiang jauh.`
+      : `Setelah sepak pojok lawan gagal, ${scorer.name} memimpin serangan balik dan mengakhirinya dengan sepakan akurat.`,
+    () => assisterName
+      ? `${assisterName} mengirim bola ke area berbahaya. ${scorer.name} menyambutnya dengan tendangan voli keras sebelum bola menyentuh tanah.`
+      : `${scorer.name} menyambar bola liar dengan tendangan voli keras yang bersarang di gawang.`,
+    () => assisterName
+      ? `${assisterName} mengirim umpan tarik dari sisi lapangan. ${scorer.name} datang dari lini kedua dan melepaskan tembakan first-time ke gawang.`
+      : `${scorer.name} menemukan ruang di depan kotak penalti dan melepaskan tembakan first-time yang mengarah ke sudut gawang.`,
+    () => `${scorer.name} mencoba tembakan jarak jauh; bola meluncur deras dan berbelok tipis, mengecoh kiper sebelum masuk ke gawang.`,
+    () => `${scorer.name} menyambar bola muntah setelah kiper menepis tembakan pertama, lalu menceploskannya dari jarak dekat.`,
+    () => assisterName
+      ? `${assisterName} mengirim umpan pendek di tepi kotak penalti. ${scorer.name} membuka ruang dengan satu sentuhan lalu melengkungkan bola ke pojok gawang.`
+      : `${scorer.name} mengontrol bola di tepi kotak penalti dan melepaskan tendangan melengkung ke pojok atas gawang.`,
   ];
-  return pick(endings);
+  return pick(scenarios)();
 }
 
 function buildMatchReport(homeName, awayName, homeGoals, awayGoals, save, allClubs) {
