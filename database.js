@@ -76,11 +76,26 @@ export const clubs = [...clubMap.values()].sort((a, b) =>
 const playersWithoutLiverpool = generatedPlayers.filter((player) => player.club !== 'Liverpool');
 export const players = [...playersWithoutLiverpool, ...liverpool2025Players];
 
+// Coverage is calculated from the data actually exposed to the app. A club with
+// zero entries is reported, not silently assigned invented player records.
+const playerCountByClub = new Map();
+for (const player of players) {
+  const key = String(player.club || '').toLowerCase();
+  playerCountByClub.set(key, (playerCountByClub.get(key) || 0) + 1);
+}
+export const clubRosterCoverage = clubs.map((club) => ({
+  club: club.name,
+  country: club.country || '',
+  league: club.league || '',
+  playerCount: playerCountByClub.get(String(club.name || '').toLowerCase()) || 0,
+}));
+export const clubsWithoutPlayers = clubRosterCoverage.filter(({ playerCount }) => playerCount === 0);
+
 export const dataStatus = {
   season: '2025/26 Liverpool roster; generated league dataset 2024/25',
   completeness: generatedPlayers.length
     ? 'generated season dataset plus curated Liverpool 2025/26 first-team roster, historic FIFA Club World Cup entrants, curated English EFL clubs, and European tier classification'
-    : 'curated Liverpool 2025/26 first-team roster plus historic FIFA Club World Cup entrants, curated English EFL clubs, European competition tier mapping, and curated league list; run npm run database:build for generated season data',
+    : 'curated Liverpool 2025/26 first-team roster plus historic FIFA Club World Cup entrants, curated English EFL clubs, European tier mapping, and curated league list; run npm run database:build to refresh season and roster catalogue data',
   source: generatedMetadata.source || 'Liverpool FC official 2025/26 squad list and curated club records',
   generatedClubCount: generatedClubs.length,
   englishLowerLeagueClubCount: englishLowerLeagueClubs.length,
@@ -91,7 +106,13 @@ export const dataStatus = {
   fifaClubWorldCupClubCount: fifaClubWorldCupClubs.length,
   fifaClubWorldCupEditions: fifaClubWorldCupMetadata.editions,
   liverpoolRosterCount: liverpool2025Players.length,
-  coverageNote: `${generatedMetadata.coverageNote || ''} Liverpool roster is the 2025/26 first-team list; player ratings and values are gameplay estimates.`,
+  rosterCataloguePlayerCount: generatedMetadata.rosterCataloguePlayerCount || 0,
+  rosterCatalogueMatchedClubCount: generatedMetadata.rosterCatalogueMatchedClubCount || 0,
+  rosterCatalogueClubsWithoutPlayers: generatedMetadata.rosterCatalogueClubsWithoutPlayers || [],
+  clubsWithPlayersCount: clubRosterCoverage.length - clubsWithoutPlayers.length,
+  clubsWithoutPlayersCount: clubsWithoutPlayers.length,
+  clubsWithoutPlayers: clubsWithoutPlayers.map(({ club, country, league }) => ({ club, country, league })),
+  coverageNote: `${generatedMetadata.coverageNote || ''} Liverpool roster is the 2025/26 first-team list; player ratings and values are gameplay estimates. Catalogue roster-only rows are current-club snapshots, not proof of 2024/25 appearances.`,
 };
 
 export const findClub = (name) => clubs.find((club) => String(club.name || '').toLowerCase() === String(name || '').toLowerCase());
@@ -110,7 +131,7 @@ export const databaseSummary = {
   totalLeagues: leagues.length,
   season: '2025/26 Liverpool squad; 2024/25 generated data',
   sampleMode: true,
-  notes: 'Liverpool 2025/26 first-team names are sourced from the club squad announcement; ratings and values are gameplay estimates. Other generated data coverage varies.',
+  notes: 'Liverpool 2025/26 first-team names are sourced from the club squad announcement; ratings and values are gameplay estimates. Other generated data coverage varies. Club roster coverage is available in dataStatus and may include clubs with no matched source players.',
 };
 
-export default { clubs, players, leagues, allLeagues, dataStatus, findClub, clubForPlayer, formatEUR, searchPlayers, clubById, playerById, databaseSummary };
+export default { clubs, players, leagues, allLeagues, dataStatus, clubRosterCoverage, clubsWithoutPlayers, findClub, clubForPlayer, formatEUR, searchPlayers, clubById, playerById, databaseSummary };
