@@ -1,0 +1,190 @@
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { clubs, players } from '../database.js';
+import { fifaClubWorldCupClubs } from '../fifa-club-world-cup.js';
+
+const SAVE_KEY = 'football-club-manager-save';
+const slug = (value) => String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+const pick = (items) => items[Math.floor(Math.random() * items.length)];
+
+function readSave() {
+  try { return JSON.parse(localStorage.getItem(SAVE_KEY) || '{}'); } catch { return {}; }
+}
+function minuteLabel(minute) { return `${minute}'`; }
+
+function makeRoster(clubName, save, allClubs) {
+  const club = allClubs.find((item) => item.name === clubName);
+  const clubPlayers = players.filter((player) => player.club === clubName);
+  if (clubPlayers.length) {
+    if (clubName === save.club && Array.isArray(save.squad) && save.squad.length) {
+      const squadPlayers = save.squad.map((id) => players.find((player) => player.id === id)).filter(Boolean);
+      if (squadPlayers.length) return squadPlayers;
+    }
+    return clubPlayers;
+  }
+  return Array.from({ length: 18 }, (_, index) => ({
+    id: `${slug(clubName)}-match-player-${index + 1}`,
+    name: `${clubName} ${['GK', 'DEF', 'MID', 'ATT'][index % 4]} ${index + 1}`,
+    position: ['GK', 'CB', 'CM', 'ST'][index % 4],
+    ovr: 60,
+  }));
+}
+
+function buildMatchReport(homeName, awayName, homeGoals, awayGoals, save, allClubs) {
+  const homeRoster = makeRoster(homeName, save, allClubs);
+  const awayRoster = makeRoster(awayName, save, allClubs);
+  const events = [];
+  const addGoalEvents = (scoringRoster, defendingRoster, count, teamName) => {
+    for (let index = 0; index < count; index += 1) {
+      const scorer = pick(scoringRoster.filter((player) => player.position !== 'GK').length ? scoringRoster.filter((player) => player.position !== 'GK') : scoringRoster);
+      const ownGoal = Math.random() < 0.06;
+      const assister = !ownGoal && Math.random() < 0.78
+        ? pick(scoringRoster.filter((player) => player.id !== scorer.id && player.position !== 'GK').length ? scoringRoster.filter((player) => player.id !== scorer.id && player.position !== 'GK') : scoringRoster)
+        : null;
+      events.push({ type: ownGoal ? 'ownGoal' : 'goal', minute: randomInt(2, 90), player: ownGoal ? pick(defendingRoster) : scorer, assist: ownGoal ? null : assister, team: teamName });
+    }
+  };
+  addGoalEvents(homeRoster, awayRoster, homeGoals, homeName);
+  addGoalEvents(awayRoster, homeRoster, awayGoals, awayName);
+
+  const cards = [];
+  for (const [name, roster] of [[homeName, homeRoster], [awayName, awayRoster]]) {
+    for (let i = 0, count = randomInt(0, 3); i < count; i += 1) {
+      cards.push({ type: 'yellow', minute: randomInt(12, 88), player: pick(roster), team: name });
+    }
+    if (Math.random() < 0.08) cards.push({ type: 'red', minute: randomInt(25, 88), player: pick(roster), team: name });
+  }
+  const substitutions = [];
+  for (const [name, roster] of [[homeName, homeRoster], [awayName, awayRoster]]) {
+    const count = randomInt(3, 5);
+    for (let index = 0; index < count; index += 1) {
+      const outgoing = pick(roster);
+      const alternatives = roster.filter((player) => player.id !== outgoing.id);
+      substitutions.push({ type: 'sub', minute: randomInt(46, 88), player: pick(alternatives.length ? alternatives : roster), replaced: outgoing, team: name });
+    }
+  }
+  events.push(...cards, ...substitutions);
+  events.sort((a, b) => a.minute - b.minute);
+
+  const homeStrength = homeRoster.reduce((sum, player) => sum + (Number(player.ovr) || 60), 0) / Math.max(1, homeRoster.length);
+  const awayStrength = awayRoster.reduce((sum, player) => sum + (Number(player.ovr) || 60), 0) / Math.max(1, awayRoster.length);
+  const strengthDiff = Math.max(-12, Math.min(12, (homeStrength - awayStrength) / 3));
+  const homePossession = Math.max(32, Math.min(68, randomInt(43, 57) + Math.round(strengthDiff)));
+  const homeShots = Math.max(homeGoals, randomInt(7, 18));
+  const awayShots = Math.max(awayGoals, randomInt(6, 16));
+  const homeOnTarget = Math.min(homeShots, Math.max(homeGoals, randomInt(Math.max(2, homeGoals), Math.max(4, homeGoals + 5))));
+  const awayOnTarget = Math.min(awayShots, Math.max(awayGoals, randomInt(Math.max(2, awayGoals), Math.max(4, awayGoals + 5))));
+  const homePasses = randomInt(280, 620);
+  const awayPasses = randomInt(260, 600);
+  const homeAcc = randomInt(74, 92);
+  const awayAcc = randomInt(72, 90);
+
+  return {
+    homeName, awayName, homeGoals, awayGoals,
+    events,
+    stats: [
+      { label: 'Penguasaan bola', home: homePossession, away: 100 - homePossession, suffix: '%' },
+      { label: 'Tembakan', home: homeShots, away: awayShots },
+      { label: 'Tepat sasaran', home: homeOnTarget, away: awayOnTarget },
+      { label: 'Akurasi operan', home: homeAcc, away: awayAcc, suffix: '%' },
+      { label: 'Total operan', home: homePasses, away: awayPasses },
+      { label: 'Pelanggaran', home: randomInt(5, 17), away: randomInt(6, 19) },
+      { label: 'Tendangan sudut', home: randomInt(1, 10), away: randomInt(1, 9) },
+      { label: 'Offside', home: randomInt(0, 4), away: randomInt(0, 4) },
+      { label: 'Penyelamatan kiper', home: Math.max(0, awayOnTarget - awayGoals), away: Math.max(0, homeOnTarget - homeGoals) },
+      { label: 'Kartu kuning', home: cards.filter((card) => card.type === 'yellow' && card.team === homeName).length, away: cards.filter((card) => card.type === 'yellow' && card.team === awayName).length },
+      { label: 'Kartu merah', home: cards.filter((card) => card.type === 'red' && card.team === homeName).length, away: cards.filter((card) => card.type === 'red' && card.team === awayName).length },
+    ],
+  };
+}
+
+function eventDescription(event) {
+  if (event.type === 'goal') return <><b>{event.player.name}</b> mencetak gol{event.assist && <> · assist {event.assist.name}</>}.</>;
+  if (event.type === 'ownGoal') return <><b>{event.player.name}</b> gol bunuh diri.</>;
+  if (event.type === 'yellow') return <><b>{event.player.name}</b> mendapat kartu kuning.</>;
+  if (event.type === 'red') return <><b>{event.player.name}</b> mendapat kartu merah.</>;
+  return <><b>{event.player.name}</b> masuk menggantikan {event.replaced.name}.</>;
+}
+
+export default function MatchStatsOverlay() {
+  const [report, setReport] = useState(null);
+  const [activeTab, setActiveTab] = useState('Ringkasan');
+  const requestId = useRef(0);
+  const allClubs = useMemo(() => [...new Map([...clubs, ...fifaClubWorldCupClubs].map((club) => [club.id || slug(club.name), club])).values()], []);
+
+  useEffect(() => {
+    const inspectResult = () => {
+      if (!requestId.current) return;
+      const resultLayer = [...document.querySelectorAll('div.fixed.inset-0')].find((element) => element.textContent?.includes('Hasil pertandingan'));
+      if (!resultLayer) return;
+      const heading = resultLayer.querySelector('h2');
+      const headingText = heading?.textContent?.trim() || '';
+      const score = headingText.match(/(\d+)\s*[–—-]\s*(\d+)/);
+      if (!score) return;
+      const homeName = readSave().club || '';
+      const awayName = allClubs.filter((club) => club.name !== homeName).sort((a, b) => b.name.length - a.name.length).find((club) => headingText.includes(club.name))?.name || 'Lawan';
+      const key = requestId.current;
+      if (report?.requestId === key) return;
+      const homeGoals = Number(score[1]);
+      const awayGoals = Number(score[2]);
+      const result = buildMatchReport(homeName, awayName, homeGoals, awayGoals, readSave(), allClubs);
+      setReport({ ...result, requestId: key });
+      setActiveTab('Ringkasan');
+      requestId.current = 0;
+    };
+    const onClickCapture = (event) => {
+      const button = event.target instanceof Element ? event.target.closest('button') : null;
+      if (!button?.textContent?.includes('Mainkan pertandingan')) return;
+      requestId.current += 1;
+      window.setTimeout(inspectResult, 80);
+    };
+    const observer = new MutationObserver(inspectResult);
+    document.addEventListener('click', onClickCapture, true);
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    return () => {
+      document.removeEventListener('click', onClickCapture, true);
+      observer.disconnect();
+    };
+  }, [allClubs, report]);
+
+  if (!report) return null;
+  const homeWon = report.homeGoals > report.awayGoals;
+  const awayWon = report.awayGoals > report.homeGoals;
+  const outcome = homeWon ? 'MENANG' : awayWon ? 'KALAH' : 'SERI';
+  const outcomeStyle = homeWon ? 'text-lime-200' : awayWon ? 'text-rose-200' : 'text-amber-100';
+  const tabs = ['Ringkasan', 'Statistik', 'Kronologi'];
+
+  return <div className="fixed inset-0 z-[60] grid place-items-center bg-black/75 p-3 backdrop-blur-sm sm:p-5" role="dialog" aria-modal="true" aria-label="Statistik hasil pertandingan">
+    <section className="w-full max-w-xl overflow-hidden rounded-[24px] border border-white/10 bg-[#0d131c] text-white shadow-2xl shadow-black/60">
+      <header className="relative overflow-hidden border-b border-white/10 bg-gradient-to-br from-lime-300/[.12] via-[#111a23] to-cyan-300/[.07] px-4 pb-4 pt-5 sm:px-6">
+        <button type="button" aria-label="Tutup statistik" onClick={() => setReport(null)} className="absolute right-3 top-3 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/20 text-lg text-white/65 hover:bg-white/10">×</button>
+        <p className="text-[9px] font-bold uppercase tracking-[.24em] text-lime-200">Laporan pertandingan · 90 menit</p>
+        <div className="mt-4 grid grid-cols-[1fr_auto_1fr] items-center gap-3">
+          <div className="min-w-0 text-right"><p className="truncate text-xs font-bold sm:text-sm">{report.homeName}</p><p className="mt-1 text-[9px] uppercase tracking-widest text-white/40">Kandang</p></div>
+          <div className="rounded-2xl border border-white/10 bg-black/25 px-4 py-2 text-3xl font-black tabular-nums sm:px-5 sm:text-4xl">{report.homeGoals}<span className="mx-1 text-white/25">:</span>{report.awayGoals}</div>
+          <div className="min-w-0 text-left"><p className="truncate text-xs font-bold sm:text-sm">{report.awayName}</p><p className="mt-1 text-[9px] uppercase tracking-widest text-white/40">Tandang</p></div>
+        </div>
+        <p className={`mt-3 text-center text-[10px] font-black tracking-[.2em] ${outcomeStyle}`}>{outcome}</p>
+        <div className="mt-4 grid grid-cols-3 gap-1 rounded-xl border border-white/[.06] bg-black/20 p-2 text-center">
+          {report.events.filter((event) => event.type === 'goal' || event.type === 'ownGoal').length ? report.events.filter((event) => event.type === 'goal' || event.type === 'ownGoal').map((event, index) => <div key={`${event.minute}-${event.player.id}-${index}`} className="text-[9px] text-white/65"><span className="font-bold text-lime-200">{minuteLabel(event.minute)}</span> {event.player.name}</div>) : <div className="col-span-3 text-[9px] text-white/40">Belum ada gol dalam pertandingan.</div>}
+        </div>
+      </header>
+      <div className="flex gap-1 border-b border-white/10 px-3 pt-2" role="tablist" aria-label="Detail pertandingan">
+        {tabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={activeTab === tab} onClick={() => setActiveTab(tab)} className={`flex-1 rounded-t-xl px-2 py-2.5 text-[10px] font-bold transition ${activeTab === tab ? 'bg-white/[.07] text-lime-200' : 'text-white/45 hover:text-white/80'}`}>{tab}</button>)}
+      </div>
+      <div className="max-h-[min(48vh,390px)] overflow-y-auto p-3 sm:p-4">
+        {activeTab === 'Ringkasan' && <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">{report.stats.slice(0, 4).map((stat) => <div key={stat.label} className="rounded-xl border border-white/[.07] bg-white/[.025] p-3"><p className="text-[9px] text-white/40">{stat.label}</p><div className="mt-1 flex items-center justify-between gap-2 text-xs font-bold tabular-nums"><span>{stat.home}{stat.suffix || ''}</span><span className="text-white/25">—</span><span>{stat.away}{stat.suffix || ''}</span></div></div>)}</div>
+          <div className="rounded-xl border border-white/[.07] bg-white/[.025] p-3"><h3 className="text-[10px] font-bold uppercase tracking-wider text-white/55">Sorotan</h3><div className="mt-2 space-y-2">{report.events.filter((event) => event.type === 'goal' || event.type === 'ownGoal' || event.type === 'red').slice(0, 5).map((event, index) => <div key={`${event.minute}-${index}`} className="flex items-start gap-2 text-[10px]"><span className="w-8 shrink-0 font-bold text-lime-200">{minuteLabel(event.minute)}</span><span className="text-white/65">{eventDescription(event)} <span className="text-white/35">({event.team})</span></span></div>)}{!report.events.some((event) => event.type === 'goal' || event.type === 'ownGoal' || event.type === 'red') && <p className="text-[10px] text-white/40">Pertandingan berjalan tanpa gol atau kartu merah.</p>}</div></div>
+        </div>}
+        {activeTab === 'Statistik' && <div className="space-y-1.5">{report.stats.map((stat) => {
+          const total = Math.max(1, stat.home + stat.away);
+          const homeWidth = stat.suffix === '%' ? stat.home : (stat.home / total) * 100;
+          return <div key={stat.label} className="rounded-xl border border-white/[.05] bg-white/[.02] px-3 py-2.5"><div className="grid grid-cols-[36px_1fr_36px] items-center gap-2 text-[10px] font-bold tabular-nums"><span className="text-left">{stat.home}{stat.suffix || ''}</span><span className="text-center text-[9px] font-medium text-white/55">{stat.label}</span><span className="text-right">{stat.away}{stat.suffix || ''}</span></div><div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/10"><span className="rounded-full bg-lime-300" style={{ width: `${homeWidth}%` }} /><span className="ml-auto rounded-full bg-cyan-300" style={{ width: `${stat.suffix === '%' ? stat.away : 100 - homeWidth}%` }} /></div></div>;
+        })}</div>}
+        {activeTab === 'Kronologi' && <div className="relative ml-3 space-y-0 border-l border-white/10 pl-5">{report.events.map((event, index) => <div key={`${event.minute}-${event.type}-${event.player.id}-${index}`} className="relative flex gap-3 border-b border-white/[.04] py-3 last:border-0"><span className={`absolute -left-[25px] top-4 h-2.5 w-2.5 rounded-full border-2 border-[#0d131c] ${event.type === 'goal' || event.type === 'ownGoal' ? 'bg-lime-300' : event.type === 'red' ? 'bg-rose-400' : event.type === 'yellow' ? 'bg-amber-300' : 'bg-cyan-300'}`} /><span className="w-8 shrink-0 text-[10px] font-bold tabular-nums text-white/45">{minuteLabel(event.minute)}</span><p className="text-[10px] leading-relaxed text-white/70">{eventDescription(event)} <span className="text-white/35">· {event.team}</span></p></div>)}</div>}
+      </div>
+      <footer className="flex items-center justify-between gap-3 border-t border-white/10 px-4 py-3 sm:px-5"><p className="text-[9px] leading-relaxed text-white/35">Statistik pertandingan adalah simulasi gameplay.</p><button type="button" onClick={() => setReport(null)} className="min-h-10 rounded-xl bg-lime-300 px-4 text-xs font-bold text-[#10150a]">Lanjut</button></footer>
+    </section>
+  </div>;
+}
