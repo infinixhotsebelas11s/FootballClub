@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Complete generated club squads from the upstream registered-player catalogue.
+"""Attach catalogue players to every club exposed by database.js.
 
-The main database builder includes players with 2024/25 league appearances.
-This supplement also adds catalogue players whose current club is represented
-in the generated club set, so registered players without a season appearance
-are not omitted. Source catalogue membership is not a historical registration
-snapshot and is marked accordingly in each added record.
+The generated season importer covers the source's 2024/25 league fixtures. This
+supplement joins the source's current player-club catalogue to both generated
+clubs and curated clubs (including historic FIFA Club World Cup and EFL lists),
+without inventing player names. Catalogue data is a current-club snapshot and
+is explicitly labeled as such; it must not be interpreted as a 2024/25 squad.
 """
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ import json
 import math
 import re
 import tempfile
+import unicodedata
 import urllib.request
 import zipfile
 from pathlib import Path
@@ -50,7 +51,6 @@ def number(value, default=0):
 
 
 def slug(value: str) -> str:
-    import unicodedata
     normalized = unicodedata.normalize('NFKD', value or '').encode('ascii', 'ignore').decode().lower()
     return re.sub(r'(^-|-$)', '', re.sub(r'[^a-z0-9]+', '-', normalized))
 
@@ -92,6 +92,21 @@ def exports(text: str, name: str):
     return match, json.loads(match.group(1))
 
 
+def read_curated_clubs() -> list[dict]:
+    """Load app club records so roster completion includes non-generated clubs."""
+    import subprocess
+
+    script = r"""
+      import { clubs } from './database.js';
+      process.stdout.write(JSON.stringify(clubs));
+    """
+    result = subprocess.run(
+        ['node', '--input-type=module', '-e', script],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
+    return json.loads(result.stdout)
+
+
 def main():
     if not ARCHIVE.exists() or ARCHIVE.stat().st_size < 1000:
         say('Downloading public player and club catalogue (large archive; this may take a while)...')
@@ -107,15 +122,16 @@ def main():
 
     text = OUTPUT.read_text(encoding='utf-8')
     metadata_match, metadata = exports(text, 'generatedMetadata')
-    players_match, current_players = exports(text, 'generatedPlayers')
-    clubs_match, generated_clubs = exports(text, 'generatedClubs')
-    # Membership is limited to clubs the app actually exposes from this source dataset.
+    _, current_players = exports(text, 'generatedPlayers')
+    _, generated_clubs = exports(text, 'generatedClubs')
+
     source_club_by_id = {str(item.get('club_id')): item for item in source_clubs if item.get('club_id')}
     target_by_source_id = {str(item.get('sourceId')): item for item in generated_clubs if item.get('sourceId')}
-    target_by_normalized_name = {slug(item.get('name', '')): item for item in generated_clubs if item.get('name')}
+    # First add clubs surfaced by the application, then prefer exact source-ID
+    # matches for generated clubs where they exist.
+    target_by_normalized_name = {slug(item.get('name', '')): item for item in read_curated_clubs() if item.get('name')}
+    target_by_normalized_name.update({slug(item.get('name', '')): item for item in generated_clubs if item.get('name')})
 
-    # The source snapshot may identify a player's current club by ID or by name.
-    # Only use a name match when the source club ID itself is unavailable/unmapped.
     existing_by_source = {}
     for player in current_players:
         source_id = str(player.get('sourceId') or '')
@@ -123,7 +139,7 @@ def main():
             existing_by_source.setdefault(source_id, []).append(player)
 
     appended = []
-    covered_catalogue_ids = set()
+    matched_club_player_counts = {}
     for source_player in source_players:
         source_id = str(source_player.get('player_id') or '')
         if not source_id:
@@ -136,7 +152,7 @@ def main():
             target_club = target_by_normalized_name.get(slug(candidate_name))
         if not target_club:
             continue
-        covered_catalogue_ids.add(source_id)
+        matched_club_player_counts[target_club.get('name', '')] = matched_club_player_counts.get(target_club.get('name', ''), 0) + 1
         if any(item.get('club') == target_club.get('name') for item in existing_by_source.get(source_id, [])):
             continue
 
@@ -146,8 +162,6 @@ def main():
         value = number(source_player.get('market_value_in_eur'))
         estimate = max(45, min(88, round(48 + 7.5 * (math.log10(max(1, value)) - 5)))) if value > 0 else 55
         age = age_at(source_player.get('date_of_birth'))
-        # If the player appeared for another team during 2024/25, retain the
-        # season record and add a separate current-roster entry for this club.
         suffix = '-roster' if existing_by_source.get(source_id) else ''
         appended.append({
             'id': f'{slug(name)}-{source_id}{suffix}',
@@ -171,21 +185,24 @@ def main():
             'dataSource': 'Upstream registered-player catalogue; current club snapshot, no 2024/25 appearance recorded for this club',
         })
 
-    # Idempotently remove previously generated roster-only rows before replacing
-    # them, so rerunning database:build does not accumulate duplicate entries.
     current_players = [player for player in current_players if not player.get('rosterOnly')]
     current_players.extend(appended)
     current_players.sort(key=lambda player: (player.get('league') or '', player.get('club') or '', player.get('name') or '', player.get('id') or ''))
     metadata['playerCount'] = len(current_players)
     metadata['rosterCataloguePlayerCount'] = len(appended)
-    metadata['rosterCatalogueNote'] = 'Roster-only additions use the upstream player catalogue current-club snapshot and are not evidence of 2024/25 appearances; source catalogue coverage varies.'
+    metadata['rosterCatalogueMatchedClubCount'] = len(matched_club_player_counts)
+    metadata['rosterCatalogueClubsWithoutPlayers'] = sorted(
+        club for club in target_by_normalized_name.values()
+        if not matched_club_player_counts.get(club.get('name', ''), 0)
+    )
+    metadata['rosterCatalogueNote'] = 'Roster-only additions use the upstream player catalogue current-club snapshot; matching is limited to clubs with an exact normalized name or source club ID and is not evidence of 2024/25 appearances. Curated-club coverage varies.'
 
     text = text[:metadata_match.start()] + f'export const generatedMetadata = {js(metadata)};' + text[metadata_match.end():]
-    # Re-find player export after the metadata string replacement (length may change).
     text = re.sub(r'^export const generatedPlayers = .+;$', f'export const generatedPlayers = {js(current_players)};', text, count=1, flags=re.M)
     OUTPUT.write_text(text, encoding='utf-8')
     say(f'Added {len(appended)} registered roster records; database now contains {len(current_players)} player records.')
-    say('Roster completion is limited to generated clubs matched in the upstream player/club catalogue; no names are invented.')
+    say(f'Catalogue matched {len(matched_club_player_counts)} app clubs; {len(metadata["rosterCatalogueClubsWithoutPlayers"])} clubs had no matched players in the source catalogue.')
+    say('No player names were invented; ratings are market-value estimates and roster-only records are labeled.')
 
 
 if __name__ == '__main__':
