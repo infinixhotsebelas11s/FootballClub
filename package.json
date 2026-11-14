@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.2.0",
   "type": "module",
-  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview", "database:build": "python3 scripts/build_database.py" },
+  "scripts": { "dev": "vite", "build": "vite build", "preview": "vite preview", "database:build": "python3 scripts/build_database.py && python3 scripts/complete_rosters.py" },
   "dependencies": { "@vitejs/plugin-react": "latest", "vite": "latest", "react": "latest", "react-dom": "latest", "lucide-react": "^0.468.0" },
   "devDependencies": { "tailwindcss": "^3.4.17", "postcss": "^8.4.49", "autoprefixer": "^10.4.20" }
 }
