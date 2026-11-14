@@ -1,0 +1,40 @@
+name: Refresh club and player database
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout selected branch
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Refresh club and player data
+        run: npm run database:build
+
+      - name: Verify app build
+        run: |
+          npm install
+          npm run build
+
+      - name: Upload refreshed database
+        uses: actions/upload-artifact@v4
+        with:
+          name: refreshed-football-database
+          path: database.generated.js
+          if-no-files-found: error
+          retention-days: 14
