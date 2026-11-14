@@ -4,12 +4,14 @@ import App from './App.jsx';
 import MatchStatsOverlay from './MatchStatsOverlay.jsx';
 import MyClubMenu from './MyClubMenu.jsx';
 import EntertainmentMenu from './EntertainmentMenu.jsx';
+import LeagueStatsMenu from './LeagueStatsMenu.jsx';
 import './index.css';
 
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <>
       <App />
+      <LeagueStatsMenu />
       <MyClubMenu />
       <EntertainmentMenu />
       <MatchStatsOverlay />
