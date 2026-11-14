@@ -1,43 +1,123 @@
 /*
- * Real-world 2024/25 football seed plus optional generated season records.
- * Run `npm run database:build` to import real players/clubs from the public
- * dcaribou/transfermarkt-datasets snapshot. Unsupported leagues/divisions are
- * intentionally not synthesized. EA FC ratings, player wages, potential, kit
- * colors, and transfer budgets are not present in the source and are not claimed
- * to be factual; any gameplay rating estimate is clearly labeled.
+ * Real-world 2024/25 season data plus historical FIFA Club World Cup participants.
+ * Generated season records come from scripts/build_database.py; the tournament
+ * add-on supplies historical participant clubs missing from that snapshot.
+ * It is not a census of every club worldwide.
  */
-import {generatedClubs,generatedPlayers,generatedLeagues,generatedMetadata} from './database.generated.js';
-export const dataStatus={season:'2024/25',completeness:generatedPlayers.length?'generated real season sample':'curated sample; run npm run database:build',source:generatedMetadata.source||'curated sample',generatedPlayerCount:generatedPlayers.length,generatedClubCount:generatedClubs.length,note:'Dataset coverage depends on source; generated ratings are estimates, not EA FC ratings. Missing leagues/divisions are not invented.'};
-export const leagues=[
- ['Premier League','England'],['La Liga','Spain'],['Serie A','Italy'],['Bundesliga','Germany'],['Ligue 1','France'],['Eredivisie','Netherlands'],['Primeira Liga','Portugal'],['Süper Lig','Turkey'],['Russian Premier League','Russia'],['Belgian Pro League','Belgium'],['League of Ireland Premier Division','Ireland'],['Scottish Premiership','Scotland'],['J1 League','Japan'],['K League 1','South Korea'],['Chinese Super League','China'],['Saudi Pro League','Saudi Arabia'],['A-League Men','Australia'],['Thai League 1','Thailand'],['V.League 1','Vietnam'],['Cambodian Premier League','Cambodia'],['Malaysia Super League','Malaysia'],['Singapore Premier League','Singapore'],['Philippines Football League','Philippines'],['Liga 1','Indonesia'],['Major League Soccer','United States'],['Brasileirão Série A','Brazil'],['Liga Profesional','Argentina'],['South African Premiership','South Africa'],['Nigeria Premier Football League','Nigeria'],['Ligue 1','Côte d’Ivoire'],['Botola Pro','Morocco'],['Egyptian Premier League','Egypt']
-].map(([name,country])=>({name,country,divisions:3}));
-const rawClubs=[
- ['Manchester City','England','Premier League','Etihad Stadium',53400,'#6caddf',150],['Arsenal','England','Premier League','Emirates Stadium',60704,'#ef0107',120],['Liverpool','England','Premier League','Anfield',61276,'#c8102e',100],['Manchester United','England','Premier League','Old Trafford',74310,'#da291c',100],['Chelsea','England','Premier League','Stamford Bridge',40341,'#034694',90],['Tottenham Hotspur','England','Premier League','Tottenham Hotspur Stadium',62850,'#ffffff',80],
- ['Real Madrid','Spain','La Liga','Santiago Bernabéu',85000,'#ffffff',120],['Barcelona','Spain','La Liga','Estadi Olímpic Lluís Companys',55626,'#a50044',90],['Atlético de Madrid','Spain','La Liga','Riyadh Air Metropolitano',70460,'#ce3524',70],['Sevilla','Spain','La Liga','Ramón Sánchez-Pizjuán',43883,'#d71920',25],
- ['Inter','Italy','Serie A','San Siro',75817,'#0068a8',60],['AC Milan','Italy','Serie A','San Siro',75817,'#fb090b',60],['Juventus','Italy','Serie A','Allianz Stadium',41507,'#111111',50],['Napoli','Italy','Serie A','Stadio Diego Armando Maradona',54726,'#087cae',45],['Roma','Italy','Serie A','Stadio Olimpico',70634,'#8e1f2f',40],
- ['Bayern Munich','Germany','Bundesliga','Allianz Arena',75024,'#dc052d',80],['Borussia Dortmund','Germany','Bundesliga','Signal Iduna Park',81365,'#fde100',50],['Bayer Leverkusen','Germany','Bundesliga','BayArena',30210,'#e32219',35],['RB Leipzig','Germany','Bundesliga','Red Bull Arena',47069,'#e21e26',40],
- ['Paris Saint-Germain','France','Ligue 1','Parc des Princes',47929,'#004170',80],['Marseille','France','Ligue 1','Orange Vélodrome',67394,'#ffffff',30],['Monaco','France','Ligue 1','Stade Louis II',18523,'#e31b23',30],
- ['Ajax','Netherlands','Eredivisie','Johan Cruyff Arena',55500,'#d2122e',30],['PSV Eindhoven','Netherlands','Eredivisie','Philips Stadion',35000,'#ed1c24',25],['Feyenoord','Netherlands','Eredivisie','De Kuip',51477,'#e30613',25],
- ['Sporting CP','Portugal','Primeira Liga','Estádio José Alvalade',50095,'#006633',30],['Benfica','Portugal','Primeira Liga','Estádio da Luz',65647,'#e83030',35],['Porto','Portugal','Primeira Liga','Estádio do Dragão',50033,'#003b7a',30],
- ['Galatasaray','Turkey','Süper Lig','RAMS Park',52280,'#a90432',35],['Fenerbahçe','Turkey','Süper Lig','Şükrü Saracoğlu Stadium',47834,'#003399',30],['Beşiktaş','Turkey','Süper Lig','Tüpraş Stadyumu',42590,'#111111',25],
- ['Celtic','Scotland','Scottish Premiership','Celtic Park',60411,'#008a4b',15],['Rangers','Scotland','Scottish Premiership','Ibrox Stadium',50817,'#163a70',15],
- ['Al Nassr','Saudi Arabia','Saudi Pro League','Al-Awwal Park',25000,'#fedd00',50],['Al Hilal','Saudi Arabia','Saudi Pro League','Kingdom Arena',27000,'#00529f',60],['Al Ittihad','Saudi Arabia','Saudi Pro League','King Abdullah Sports City',62345,'#f5c400',45],
- ['Persib Bandung','Indonesia','Liga 1','Stadion Gelora Bandung Lautan Api',38000,'#1685ca',2],['Persija Jakarta','Indonesia','Liga 1','Jakarta International Stadium',82000,'#e31e24',2],['Arema FC','Indonesia','Liga 1','Stadion Soepriadi',12000,'#00529b',1],['Persebaya Surabaya','Indonesia','Liga 1','Stadion Gelora Bung Tomo',46000,'#008a4b',1.5],['Bali United','Indonesia','Liga 1','Kapten I Wayan Dipta Stadium',18000,'#d71920',1.5],['Borneo FC Samarinda','Indonesia','Liga 1','Stadion Segiri',16000,'#e30613',1.5],['PSM Makassar','Indonesia','Liga 1','Stadion Batakan',40000,'#c8102e',1.2],
- ['Inter Miami CF','United States','Major League Soccer','Chase Stadium',21550,'#f7b5cd',25],['Flamengo','Brazil','Brasileirão Série A','Maracanã',78838,'#c8102e',35],['Palmeiras','Brazil','Brasileirão Série A','Allianz Parque',43713,'#006437',30],['Boca Juniors','Argentina','Liga Profesional','La Bombonera',54000,'#003e7e',15],['River Plate','Argentina','Liga Profesional','Estadio Monumental',84567,'#ffffff',20]
-];
-const slug=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-const curatedClubs=rawClubs.map(([name,country,league,stadium,capacity,primaryKit,budgetEURm])=>({id:slug(name),name,country,league,stadium,capacity,primaryKit,transferBudgetEUR:Math.round(budgetEURm*1_000_000)}));
-const mergeById=(generated,curated)=>{const map=new Map(generated.map(item=>[item.id,item]));curated.forEach(item=>map.set(item.id,{...map.get(item.id),...item}));return [...map.values()]};
-export const clubs=mergeById(generatedClubs,curatedClubs);
-const rawPlayers=[
- ['Erling Haaland',24,'ST','Manchester City','Norway',91,93,180000000,300000],['Kevin De Bruyne',33,'CM','Manchester City','Belgium',90,90,35000000,400000],['Bukayo Saka',23,'RW','Arsenal','England',89,92,150000000,200000],['Mohamed Salah',32,'RW','Liverpool','Egypt',89,89,55000000,350000],['Virgil van Dijk',33,'CB','Liverpool','Netherlands',89,89,30000000,220000],['Kylian Mbappé',25,'ST','Real Madrid','France',91,95,180000000,300000],['Jude Bellingham',21,'CAM','Real Madrid','England',90,94,180000000,250000],['Vinícius Júnior',24,'LW','Real Madrid','Brazil',90,94,200000000,250000],['Lamine Yamal',17,'RW','Barcelona','Spain',89,96,180000000,100000],['Robert Lewandowski',36,'ST','Barcelona','Poland',88,88,15000000,200000],['Antoine Griezmann',33,'ST','Atlético de Madrid','France',88,88,25000000,200000],['Lautaro Martínez',27,'ST','Inter','Argentina',89,90,95000000,180000],['Nicolò Barella',27,'CM','Inter','Italy',87,89,80000000,120000],['Rafael Leão',25,'LW','AC Milan','Portugal',86,91,90000000,120000],['Jamal Musiala',21,'CAM','Bayern Munich','Germany',87,93,140000000,150000],['Harry Kane',31,'ST','Bayern Munich','England',90,90,100000000,400000],['Florian Wirtz',21,'CAM','Bayer Leverkusen','Germany',88,92,140000000,100000],['Ousmane Dembélé',27,'RW','Paris Saint-Germain','France',86,87,60000000,200000],['Cristiano Ronaldo',39,'ST','Al Nassr','Portugal',86,86,12000000,400000],['Lionel Messi',37,'RW','Inter Miami CF','Argentina',88,88,20000000,200000],['Marc Klok',31,'CM','Persib Bandung','Indonesia',72,72,400000,2500],['Rizky Ridho',23,'CB','Persija Jakarta','Indonesia',71,78,600000,2000],['Marselino Ferdinan',20,'CAM','Oxford United','Indonesia',68,80,300000,3000],['Thom Haye',29,'CM','Almere City','Netherlands / Indonesia',71,71,700000,5000],['Ciro Alves',35,'LW','Persib Bandung','Brazil / Indonesia',69,69,250000,3000],['David da Silva',34,'ST','Persib Bandung','Brazil',70,70,300000,3000],['Bruno Moreira',25,'LW','Persebaya Surabaya','Brazil',67,70,350000,2000]
-];
-const curatedPlayers=rawPlayers.map(([name,age,position,club,country,ovr,potential,marketValueEUR,weeklyWageEUR])=>({id:slug(name),name,age,position,club,country,ovr,potential,marketValueEUR,weeklyWageEUR,wonderkid:age<=21&&potential>=80,ratingSource:'curated estimate'}));
-export const players=mergeById(generatedPlayers,curatedPlayers);
-const leagueMap=new Map(leagues.map(x=>[`${x.country}|${x.name}`,x]));
-for(const item of generatedLeagues){const key=`${item.country}|${item.name}`;if(!leagueMap.has(key))leagueMap.set(key,item)}
-export const allLeagues=[...leagueMap.values()];
-export const findClub=name=>clubs.find(c=>c.name.toLowerCase()===name.toLowerCase());
-export const clubForPlayer=player=>findClub(player.club);
-export const formatEUR=value=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(value||0);
-export const searchPlayers=({name='',club='',league=''}={})=>players.filter(p=>p.name.toLowerCase().includes(name.toLowerCase())&&p.club.toLowerCase().includes(club.toLowerCase())&&(!league||clubForPlayer(p)?.league===league));
+import {
+  generatedClubs,
+  generatedPlayers,
+  generatedLeagues,
+  generatedMetadata,
+} from './database.generated.js';
+import {
+  fifaClubWorldCupClubs,
+  fifaClubWorldCupLeagues,
+  fifaClubWorldCupMetadata,
+} from './fifa-club-world-cup.js';
+
+const slug = (value) => String(value || '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '')
+  .replace(/[^a-z0-9]+/g, '-')
+  .replace(/(^-|-$)/g, '');
+
+const curatedLeagueRows = [
+  ['Premier League','England'], ['La Liga','Spain'], ['Serie A','Italy'],
+  ['Bundesliga','Germany'], ['Ligue 1','France'], ['Eredivisie','Netherlands'],
+  ['Primeira Liga','Portugal'], ['Süper Lig','Turkey'],
+  ['Russian Premier League','Russia'], ['Jupiler Pro League','Belgium'],
+  ['League of Ireland','Ireland'], ['Scottish Premiership','Scotland'],
+  ['J1 League','Japan'], ['K League 1','South Korea'],
+  ['Chinese Super League','China'], ['Saudi Pro League','Saudi Arabia'],
+  ['A-League Men','Australia'], ['Thai League 1','Thailand'],
+  ['V.League 1','Vietnam'], ['Cambodian League','Cambodia'],
+  ['Malaysia Super League','Malaysia'], ['Singapore Premier League','Singapore'],
+  ['Philippines Football League','Philippines'], ['Liga 1','Indonesia'],
+  ['Major League Soccer','United States'], ['Brasileirão Série A','Brazil'],
+  ['Primera División','Argentina'], ['Premier Soccer League','South Africa'],
+  ['Nigeria Premier League','Nigeria'], ['Ligue 1 Côte d’Ivoire','Ivory Coast'],
+  ['Botola Pro','Morocco'], ['Egyptian Premier League','Egypt'],
+].map(([name, country]) => ({ name, country, divisions: 1 }));
+
+const leagueMap = new Map();
+for (const league of [...curatedLeagueRows, ...generatedLeagues, ...fifaClubWorldCupLeagues]) {
+  const key = `${String(league.country || '').toLowerCase()}|${String(league.name || '').toLowerCase()}`;
+  if (key !== '|') leagueMap.set(key, { ...(leagueMap.get(key) || {}), ...league });
+}
+export const leagues = [...leagueMap.values()];
+export const allLeagues = leagues;
+
+// Combine the season source and historic tournament entrants, keeping real
+// season metadata when available and adding the FIFA editions as provenance.
+const clubMap = new Map();
+for (const club of [...generatedClubs, ...fifaClubWorldCupClubs]) {
+  const id = club.id || slug(club.name);
+  const previous = clubMap.get(id) || {};
+  clubMap.set(id, {
+    ...previous,
+    ...club,
+    id,
+    fifaClubWorldCupEditions: [
+      ...new Set([
+        ...(previous.fifaClubWorldCupEditions || []),
+        ...(club.fifaClubWorldCupEditions || []),
+      ]),
+    ].sort((a, b) => a - b),
+  });
+}
+export const clubs = [...clubMap.values()].sort((a, b) =>
+  `${a.country || ''}|${a.league || ''}|${a.name || ''}`.localeCompare(
+    `${b.country || ''}|${b.league || ''}|${b.name || ''}`,
+  ),
+);
+
+export const players = generatedPlayers;
+export const dataStatus = {
+  season: '2024/25',
+  completeness: generatedPlayers.length ? 'generated real season sample plus historic FIFA Club World Cup entrants' : 'historic FIFA Club World Cup entrants plus curated league list; run npm run database:build for season players and clubs',
+  source: generatedMetadata.source || 'curated FIFA Club World Cup participant records and generated season dataset',
+  generatedClubCount: generatedClubs.length,
+  fifaClubWorldCupClubCount: fifaClubWorldCupClubs.length,
+  fifaClubWorldCupEditions: fifaClubWorldCupMetadata.editions,
+  coverageNote: fifaClubWorldCupMetadata.note,
+};
+
+export const findClub = (name) => clubs.find(
+  (club) => String(club.name || '').toLowerCase() === String(name || '').toLowerCase(),
+);
+export const clubForPlayer = (player) => findClub(player?.club);
+export const formatEUR = (value) => new Intl.NumberFormat('en-GB', {
+  style: 'currency', currency: 'EUR', maximumFractionDigits: 0,
+}).format(value || 0);
+export const searchPlayers = ({ name = '', club = '', league = '' } = {}) => players.filter((player) =>
+  String(player.name || '').toLowerCase().includes(name.toLowerCase())
+  && String(player.club || '').toLowerCase().includes(club.toLowerCase())
+  && (!league || clubForPlayer(player)?.league === league),
+);
+export const clubById = (id) => clubs.find((club) => club.id === id);
+export const playerById = (id) => players.find((player) => player.id === id);
+export const databaseSummary = {
+  totalClubs: clubs.length,
+  totalPlayers: players.length,
+  totalLeagues: leagues.length,
+  season: '2024/25',
+  sampleMode: true,
+  notes: 'Season coverage is limited to the upstream dataset; FIFA Club World Cup entrants cover editions 2015–2023 and 2025, not every club worldwide.',
+};
+
+export default {
+  clubs,
+  players,
+  leagues,
+  allLeagues,
+  dataStatus,
+  findClub,
+  clubForPlayer,
+  formatEUR,
+  searchPlayers,
+  clubById,
+  playerById,
+  databaseSummary,
+};
