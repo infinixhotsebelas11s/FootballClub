@@ -1,8 +1,9 @@
 /*
- * Real-world 2024/25 season data plus historical FIFA Club World Cup participants.
- * Generated season records come from scripts/build_database.py; the tournament
- * add-on supplies historical participant clubs missing from that snapshot.
- * It is not a census of every club worldwide.
+ * Real-world 2024/25 season data plus historical FIFA Club World Cup participants
+ * and a curated EFL lower-division list for England.
+ * Generated season records come from scripts/build_database.py; tournament and
+ * EFL add-ons supply focused clubs missing from that snapshot. This is not a
+ * census of every club worldwide.
  */
 import {
   generatedClubs,
@@ -15,6 +16,10 @@ import {
   fifaClubWorldCupLeagues,
   fifaClubWorldCupMetadata,
 } from './fifa-club-world-cup.js';
+import {
+  englishLowerLeagueClubs,
+  englishLowerLeagueCompetitions,
+} from './english-lower-leagues.js';
 
 const slug = (value) => String(value || '')
   .toLowerCase()
@@ -42,17 +47,17 @@ const curatedLeagueRows = [
 ].map(([name, country]) => ({ name, country, divisions: 1 }));
 
 const leagueMap = new Map();
-for (const league of [...curatedLeagueRows, ...generatedLeagues, ...fifaClubWorldCupLeagues]) {
+for (const league of [...curatedLeagueRows, ...generatedLeagues, ...fifaClubWorldCupLeagues, ...englishLowerLeagueCompetitions]) {
   const key = `${String(league.country || '').toLowerCase()}|${String(league.name || '').toLowerCase()}`;
   if (key !== '|') leagueMap.set(key, { ...(leagueMap.get(key) || {}), ...league });
 }
 export const leagues = [...leagueMap.values()];
 export const allLeagues = leagues;
 
-// Combine the season source and historic tournament entrants, keeping real
-// season metadata when available and adding the FIFA editions as provenance.
+// Keep upstream season metadata where available, while allowing focused add-ons
+// to fill missing clubs and attach division/provenance fields.
 const clubMap = new Map();
-for (const club of [...generatedClubs, ...fifaClubWorldCupClubs]) {
+for (const club of [...generatedClubs, ...fifaClubWorldCupClubs, ...englishLowerLeagueClubs]) {
   const id = club.id || slug(club.name);
   const previous = clubMap.get(id) || {};
   clubMap.set(id, {
@@ -76,12 +81,16 @@ export const clubs = [...clubMap.values()].sort((a, b) =>
 export const players = generatedPlayers;
 export const dataStatus = {
   season: '2024/25',
-  completeness: generatedPlayers.length ? 'generated real season sample plus historic FIFA Club World Cup entrants' : 'historic FIFA Club World Cup entrants plus curated league list; run npm run database:build for season players and clubs',
-  source: generatedMetadata.source || 'curated FIFA Club World Cup participant records and generated season dataset',
+  completeness: generatedPlayers.length
+    ? 'generated season dataset plus historic FIFA Club World Cup entrants and curated 2024/25 English EFL clubs'
+    : 'historic FIFA Club World Cup entrants, curated English EFL clubs, and curated league list; run npm run database:build for season players and clubs',
+  source: generatedMetadata.source || 'curated FIFA Club World Cup and English EFL records plus generated season dataset',
   generatedClubCount: generatedClubs.length,
+  englishLowerLeagueClubCount: englishLowerLeagueClubs.length,
+  englishLowerLeagueDivisions: 'EFL Championship, League One, League Two (2024/25)',
   fifaClubWorldCupClubCount: fifaClubWorldCupClubs.length,
   fifaClubWorldCupEditions: fifaClubWorldCupMetadata.editions,
-  coverageNote: fifaClubWorldCupMetadata.note,
+  coverageNote: `${generatedMetadata.coverageNote || ''} Focused EFL addition covers England tiers 2–4 for 2024/25; it is not a complete worldwide census.`,
 };
 
 export const findClub = (name) => clubs.find(
@@ -104,7 +113,7 @@ export const databaseSummary = {
   totalLeagues: leagues.length,
   season: '2024/25',
   sampleMode: true,
-  notes: 'Season coverage is limited to the upstream dataset; FIFA Club World Cup entrants cover editions 2015–2023 and 2025, not every club worldwide.',
+  notes: 'Season coverage is limited to upstream sources; English tiers 2–4 are a focused curated 2024/25 EFL addition, not every club worldwide.',
 };
 
 export default {
