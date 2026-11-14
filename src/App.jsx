@@ -1,52 +1,267 @@
-import React,{useEffect,useMemo,useState} from 'react';
-import {Activity,ArrowRight,Banknote,CalendarDays,Coins,Database,Dribbble,HeartPulse,Home,Menu,Play,Search,Shield,ShoppingBag,SlidersHorizontal,Sparkles,Star,Target,TrendingUp,Trophy,Users,Wallet,X} from 'lucide-react';
-import {clubs,players,leagues,dataStatus,formatEUR,clubForPlayer} from '../database.js';
+import React, { useMemo, useState } from 'react';
+import { clubs, players, dataStatus } from '../database.js';
 
-const roles=['Asisten Pelatih','Manajer','Direktur Teknik','Direktur Olahraga','CEO','Presiden Klub','Pemilik Klub'];
-const nav=[['Ringkasan',Home],['Skuad',Users],['Taktik',SlidersHorizontal],['Database',Database],['Transfer',ShoppingBag],['Karier',TrendingUp],['Keuangan',Coins]];
-const initialSave={role:'Manajer',rep:42,personal:250000,club:'Persib Bandung',clubCash:2000000,season:2024,week:1,tactics:{formation:'4-3-3',mentality:'Seimbang',style:'Gegenpressing'},training:'Keseimbangan',facilities:1,squad:players.filter(p=>p.club==='Persib Bandung').map(p=>p.id),log:['Selamat datang, Manajer. Target musim ini: amankan posisi papan atas Liga 1.'],points:0,wins:0,draws:0,losses:0,gf:0,ga:0,matches:0,owned:[],ticket:75000};
-const readSave=()=>{try{return {...initialSave,...JSON.parse(localStorage.getItem('touchline-save')||'{}')}}catch{return {...initialSave}}};
-const money=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(n||0);
-const eur=n=>new Intl.NumberFormat('en-GB',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0);
-const compact=n=>n>=1e6?`€${(n/1e6).toFixed(1)}m`:n>=1000?`€${Math.round(n/1000)}k`:eur(n);
-const sampleLeagueClubs=name=>clubs.filter(c=>c.league===name);
+const initialSave = {
+  club: 'Persib Bandung',
+  cash: 2000000,
+  rep: 42,
+  season: 2024,
+  week: 1,
+  squad: ['marc-klok', 'rizky-ridho', 'sandy-walsh', 'muhammad-ferrari', 'hizkia-arthur']
+};
 
-export default function App(){
- const [game,setGame]=useState(readSave);const [page,setPage]=useState('Ringkasan');const [mobile,setMobile]=useState(false);const [search,setSearch]=useState('');const [clubFilter,setClubFilter]=useState('');const [leagueFilter,setLeagueFilter]=useState('');const [match,setMatch]=useState(null);const [offer,setOffer]=useState(null);const [toast,setToast]=useState('');
- useEffect(()=>{try{localStorage.setItem('touchline-save',JSON.stringify(game))}catch{}},[game]);
- useEffect(()=>{if(!match||match.minute>=90)return;const t=setTimeout(()=>setMatch(m=>m?advanceMatch(m):m),550);return()=>clearTimeout(t)},[match]);
- const club=clubs.find(c=>c.name===game.club)||clubs[0];
- const team=useMemo(()=>players.filter(p=>game.squad.includes(p.id)),[game.squad]);
- const results=useMemo(()=>players.filter(p=>p.name.toLowerCase().includes(search.toLowerCase())&&p.club.toLowerCase().includes(clubFilter.toLowerCase())&&(!leagueFilter||clubForPlayer(p)?.league===leagueFilter)),[search,clubFilter,leagueFilter]);
- const log=text=>setGame(g=>({...g,log:[text,...(g.log||[])].slice(0,12)}));
- const update=values=>setGame(g=>({...g,...values}));
- function advanceMatch(m){let minute=Math.min(90,m.minute+Math.floor(Math.random()*9)+4);let events=[...m.events];if(Math.random()<.30){const home=Math.random()<m.homeChance;const list=home?(team.length?team:[{name:club.name}]):[{name:m.opponent.name}];const actor=list[Math.floor(Math.random()*list.length)];const isGoal=Math.random()<(home?m.homeChance:.20);if(isGoal){events.push({minute,text:`Menit ${minute}: GOAL! ${actor.name} mencetak gol!`,goal:home?'home':'away'});m={...m,homeScore:m.homeScore+(home?1:0),awayScore:m.awayScore+(home?0:1)}}else events.push({minute,text:`Menit ${minute}: ${actor.name} mengancam gawang, tetapi peluang belum berbuah gol.`})}if(minute>=90){events.push({minute:90,text:`Peluit akhir: ${club.name} ${m.homeScore}–${m.awayScore} ${m.opponent.name}.`});setTimeout(()=>finishMatch({...m,minute:90,events}),550)}return {...m,minute,events}}
- function finishMatch(m){setMatch(null);const gf=m.homeScore,ga=m.awayScore,pts=gf>ga?3:gf===ga?1:0;setGame(g=>({...g,week:g.week+1,matches:g.matches+1,points:g.points+pts,wins:g.wins+(gf>ga?1:0),draws:g.draws+(gf===ga?1:0),losses:g.losses+(gf<ga?1:0),gf:g.gf+gf,ga:g.ga+ga,clubCash:g.clubCash+Math.max(500000,g.ticket*18),rep:Math.max(0,Math.min(100,g.rep+(gf>ga?2:gf<ga?-1:0))),log:[`Hasil akhir ${gf}–${ga} melawan ${m.opponent.name}.`,...g.log].slice(0,12)}))}
- function startMatch(){const opponents=sampleLeagueClubs(club.league).filter(c=>c.id!==club.id);if(!opponents.length){notify('Data klub lawan untuk liga ini belum tersedia.');return}const opponent=opponents[(game.week-1)%opponents.length];const rating=team.length?team.reduce((a,p)=>a+p.ovr,0)/team.length:65;setMatch({minute:0,homeScore:0,awayScore:0,opponent,events:[{minute:0,text:`Kick-off! ${club.name} menghadapi ${opponent.name}.`}],homeChance:Math.max(.15,Math.min(.78,.43+(rating-65)*.012+(game.tactics.mentality==='Menyerang'?.05:0)))}}
- function notify(s){setToast(s);setTimeout(()=>setToast(''),2800)}
- function sign(p){if(game.squad.includes(p.id)){notify('Pemain sudah berada dalam skuad.');return}setOffer({player:p,price:Math.ceil(p.marketValueEUR*1.1)})}
- function confirmSign(){if(!offer)return;if(offer.price>game.clubCash){notify('Kas klub tidak mencukupi.');return}update({clubCash:game.clubCash-offer.price,squad:[...game.squad,offer.player.id],log:[`${offer.player.name} direkrut dengan biaya ${eur(offer.price)}.`,...game.log]});setOffer(null)}
- const standings=useMemo(()=>{const list=sampleLeagueClubs(club.league).map((c,i)=>({name:c.name,played:c.name===club.name?game.matches:0,pts:c.name===club.name?game.points:0,gf:c.name===club.name?game.gf:0,ga:c.name===club.name?game.ga:0,seed:i}));return list.sort((a,b)=>b.pts-a.pts||(b.gf-b.ga)-(a.gf-a.ga)||b.gf-a.gf||a.seed-b.seed)},[club.league,club.name,game.matches,game.points,game.gf,game.ga]);
- const promote=()=>{const i=roles.indexOf(game.role);if(i<roles.length-1){const next=roles[i+1];update({role:next,rep:Math.min(100,game.rep+8)});log(`Promosi: Anda sekarang ${next}.`)}else notify('Anda telah mencapai jabatan tertinggi.')};
- const saveDownload=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(game,null,2)],{type:'application/json'}));a.download='touchline-save.json';a.click();URL.revokeObjectURL(a.href)};
- const loadUpload=e=>{const f=e.target.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{setGame({...initialSave,...JSON.parse(r.result)});notify('Save berhasil dimuat.')}catch{notify('File save tidak valid.')}};r.readAsText(f)};
- function PanelTitle({icon:Icon,title,subtitle}){return <div className="mb-6 flex items-start gap-4"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-lime-300/10 text-lime-200"><Icon size={21}/></div><div><h1 className="text-2xl font-black">{title}</h1><p className="mt-1 text-sm text-white/45">{subtitle}</p></div></div>}
- const stat=(label,value,sub,Icon)=><div className="rounded-2xl border border-white/[.07] bg-[#111713] p-4"><div className="flex justify-between text-xs text-white/45">{label}<Icon size={16} className="text-lime-300"/></div><div className="mt-3 text-xl font-black">{value}</div><div className="mt-1 text-[11px] text-white/40">{sub}</div></div>;
- const playerLine=p=><div key={p.id} className="flex items-center gap-3 border-b border-white/[.06] py-3 last:border-0"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[.06] text-xs font-black text-lime-200">{p.ovr}</div><div className="min-w-0 flex-1"><b className="text-sm">{p.name}</b>{p.wonderkid&&<span className="ml-2 text-[9px] text-lime-300">✦ WONDERKID</span>}<div className="truncate text-[11px] text-white/40">{p.position} · {p.club} · {p.age} tahun</div></div><div className="hidden text-right text-xs sm:block">{eur(p.marketValueEUR)}<div className="text-[10px] text-white/35">OVR {p.ovr} · POT {p.potential}</div></div>{page==='Transfer'&&<button onClick={()=>sign(p)} className="rounded-lg bg-lime-300 px-3 py-2 text-xs font-black text-black">Nego</button>}</div>;
- return <div className="min-h-screen text-white"><div className="mx-auto flex min-h-screen max-w-[1600px]">
- <aside className={`${mobile?'fixed inset-0 z-30':'hidden'} lg:flex lg:static lg:z-auto w-[250px] shrink-0 flex-col border-r border-white/[.07] bg-[#0b100c] p-5`}><div className="mb-9 flex items-center justify-between"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-lime-300 text-black"><Dribbble/></div><div className="font-black">TOUCHLINE<div className="text-[9px] tracking-[.25em] text-lime-300">FOOTBALL CAREER</div></div></div><button className="lg:hidden" onClick={()=>setMobile(false)}><X/></button></div><div className="mb-3 px-3 text-[10px] uppercase tracking-widest text-white/35">Menu Utama</div>{nav.map(([name,Icon])=><button key={name} onClick={()=>{setPage(name);setMobile(false)}} className={`mb-1 flex items-center gap-3 rounded-xl px-3 py-3 text-sm ${page===name?'bg-lime-300 font-bold text-black':'text-white/60 hover:bg-white/5'}`}><Icon size={17}/>{name}{name==='Database'&&<span className="ml-auto text-[10px]">{players.length}</span>}</button>)}<div className="mt-auto rounded-2xl border border-lime-300/15 bg-lime-300/[.05] p-4"><div className="text-xs font-bold text-lime-200">MUSIM {game.season}/{game.season+1}</div><p className="my-2 text-xs text-white/45">Reputasi {game.rep}/100</p><div className="h-1.5 rounded bg-white/10"><div className="h-1.5 rounded bg-lime-300" style={{width:`${game.rep}%`}}/></div></div></aside>
- <main className="min-w-0 flex-1"><header className="sticky top-0 z-20 flex min-h-[76px] items-center justify-between gap-3 border-b border-white/[.07] bg-[#090d0b]/90 px-4 backdrop-blur-xl sm:px-8"><div className="flex items-center gap-3"><button className="lg:hidden" onClick={()=>setMobile(true)}><Menu/></button><div className="text-[10px] uppercase tracking-wider text-white/35">{club.league} · Pekan {game.week}</div><div className="text-sm font-bold">{club.name}</div></div><div className="flex items-center gap-2"><div className="hidden rounded-lg border border-white/10 px-3 py-2 sm:block"><div className="text-[9px] text-white/40">JABATAN</div><b className="text-xs text-lime-200">{game.role.toUpperCase()}</b></div><div className="rounded-lg border border-white/10 px-3 py-2"><div className="text-[9px] text-white/40">PRIBADI</div><b className="text-xs text-lime-200">{compact(game.personal)}</b></div><div className="rounded-lg border border-white/10 px-3 py-2"><div className="text-[9px] text-white/40">KAS KLUB</div><b className="text-xs">{compact(game.clubCash)}</b></div></div></header>
- <div className="mx-auto max-w-[1250px] p-4 sm:p-8">
- {page==='Ringkasan'&&<><div className="mb-6 flex flex-wrap items-end justify-between gap-4"><div><div className="mb-2 text-xs text-lime-200">MUSIM 2024/25 · PEKAN {game.week}</div><h1 className="text-3xl font-black sm:text-4xl">Bangun <span className="text-lime-300">warisanmu.</span></h1><p className="mt-2 text-sm text-white/45">Kelola klub hari ini. Pimpin sepak bola esok hari.</p></div><button onClick={startMatch} className="flex items-center gap-2 rounded-xl bg-lime-300 px-5 py-3 text-sm font-black text-black"><Play size={16}/> Mainkan pertandingan</button></div><div className="grid grid-cols-2 gap-3 xl:grid-cols-4">{stat('Posisi liga',`#${Math.max(1,standings.findIndex(x=>x.name===club.name)+1)}`,`${game.points} poin · ${game.matches} dimainkan`,Trophy)}{stat('Reputasi',`${game.rep}/100`,'Terus buktikan kualitasmu',Star)}{stat('Skuad',`${team.length} pemain`,'Pemain tersedia dalam dataset',Users)}{stat('Kas klub',compact(game.clubCash),'Budget yang tersedia',Banknote)}</div><div className="mt-5 grid gap-5 xl:grid-cols-[1.4fr_1fr]"><section className="rounded-2xl border border-white/[.07] bg-[#111713] p-5"><h2 className="mb-4 font-bold">Klasemen · {club.league}</h2><div className="grid grid-cols-[30px_1fr_45px_45px] border-b border-white/10 pb-2 text-[10px] uppercase text-white/35"><span>#</span><span>Klub (data sampel)</span><span className="text-right">SG</span><span className="text-right">Pts</span></div>{standings.map((r,i)=><div key={r.name} className={`grid grid-cols-[30px_1fr_45px_45px] border-b border-white/[.04] py-3 text-xs ${r.name===club.name?'font-bold text-lime-200':''}`}><span>{i+1}</span><span className="truncate">{r.name}</span><span className="text-right">{r.gf-r.ga}</span><span className="text-right">{r.pts}</span></div>)}</section><section className="rounded-2xl border border-white/[.07] bg-[#111713] p-5"><h2 className="mb-4 font-bold">Aktivitas klub</h2>{game.log.slice(0,7).map((x,i)=><div key={i} className="border-b border-white/[.05] py-3 text-xs text-white/65"><span className="mr-2 text-lime-300">●</span>{x}</div>)}</section></div></>}
- {page==='Skuad'&&<><PanelTitle icon={Users} title="Skuad utama" subtitle={`${club.name} · pemain yang tersedia dalam dataset.`}/><div className="rounded-2xl border border-white/[.07] bg-[#111713] px-4">{team.length?team.map(playerLine):<p className="py-8 text-center text-sm text-white/40">Tidak ada profil pemain untuk klub ini dalam sampel data.</p>}</div></>}
- {page==='Taktik'&&<><PanelTitle icon={SlidersHorizontal} title="Papan taktik" subtitle="Atur pendekatan pertandingan dan latihan mingguan."/><div className="grid gap-4 sm:grid-cols-2">{[['formation','Formasi',['4-3-3','4-4-2','3-5-2','4-2-3-1','3-4-3']],['mentality','Mentalitas',['Sangat Defensif','Defensif','Seimbang','Menyerang','All-out Attack']],['style','Gaya main',['Tiki-Taka','Counter Attack','Gegenpressing','Direct Passing','Wing Play']]].map(([key,title,opts])=><label key={key} className="rounded-2xl border border-white/[.07] bg-[#111713] p-5 text-sm font-bold">{title}<select value={game.tactics[key]} onChange={e=>update({tactics:{...game.tactics,[key]:e.target.value}})} className="mt-4 w-full rounded-xl border border-white/10 bg-[#0b100c] p-3">{opts.map(x=><option key={x}>{x}</option>)}</select></label>)}<label className="rounded-2xl border border-white/[.07] bg-[#111713] p-5 text-sm font-bold">Latihan mingguan<select value={game.training} onChange={e=>update({training:e.target.value})} className="mt-4 w-full rounded-xl border border-white/10 bg-[#0b100c] p-3">{['Keseimbangan','Kebugaran','Penyelesaian Akhir','Pertahanan','Penguasaan Bola'].map(x=><option key={x}>{x}</option>)}</select></label></div></>}
- {page==='Database'&&<><PanelTitle icon={Database} title="Database pemain" subtitle={`${dataStatus.season} · ${players.length} profil dalam dataset terkurasi.`}/><div className="mb-4 grid gap-2 sm:grid-cols-3"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari nama pemain" className="rounded-xl border border-white/10 bg-[#111713] px-3 py-3 text-sm"/><input value={clubFilter} onChange={e=>setClubFilter(e.target.value)} placeholder="Filter klub" className="rounded-xl border border-white/10 bg-[#111713] px-3 py-3 text-sm"/><select value={leagueFilter} onChange={e=>setLeagueFilter(e.target.value)} className="rounded-xl border border-white/10 bg-[#111713] px-3 py-3 text-sm"><option value="">Semua liga</option>{[...new Set(clubs.map(c=>c.league))].map(l=><option key={l}>{l}</option>)}</select></div><div className="rounded-2xl border border-white/[.07] bg-[#111713] px-4">{results.length?results.map(playerLine):<div className="py-10 text-center text-white/40">Tidak ada hasil.</div>}</div><p className="mt-3 text-[11px] text-white/35">Dataset belum mencapai 500 pemain/100 klub. Rating, nilai, dan gaji adalah estimasi; bukan feed resmi EA/Transfermarkt. Nama tidak ditambahkan sebagai data palsu untuk mengejar jumlah.</p></>}
- {page==='Transfer'&&<><PanelTitle icon={ShoppingBag} title="Bursa transfer" subtitle="Pilih pemain dari dataset dan ajukan tawaran."/><div className="mb-4 flex gap-2"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Cari pemain" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#111713] px-3 py-3 text-sm"/><span className="rounded-xl border border-lime-300/20 px-3 py-3 text-xs text-lime-200">Budget {compact(game.clubCash)}</span></div><div className="rounded-2xl border border-white/[.07] bg-[#111713] px-4">{results.map(playerLine)}</div></>}
- {page==='Karier'&&<><PanelTitle icon={TrendingUp} title="Jalur karier" subtitle="Bangun reputasi untuk naik dari staf pelatih ke pemilik."/><div className="space-y-2">{roles.map((r,i)=><div key={r} className={`flex items-center gap-4 rounded-xl border p-4 ${game.role===r?'border-lime-300/40 bg-lime-300/[.06]':'border-white/[.07] bg-[#111713]'}`}><div className="grid h-9 w-9 place-items-center rounded-lg bg-white/[.06] text-xs">{i+1}</div><b className="flex-1 text-sm">{r}</b>{game.role===r&&<span className="text-[10px] text-lime-200">AKTIF</span>}</div>)}</div><button onClick={promote} className="mt-4 rounded-xl bg-lime-300 px-4 py-3 text-sm font-black text-black">Ajukan promosi</button><div className="mt-5 rounded-2xl border border-white/10 bg-[#111713] p-5"><h3 className="font-bold">Save & load</h3><div className="mt-3 flex flex-wrap gap-2"><button onClick={saveDownload} className="rounded-lg border border-white/10 px-3 py-2 text-xs">Unduh save</button><label className="cursor-pointer rounded-lg border border-white/10 px-3 py-2 text-xs">Muat save<input type="file" accept="application/json" onChange={loadUpload} className="hidden"/></label><button onClick={()=>{localStorage.removeItem('touchline-save');setGame({...initialSave});notify('Save direset.')}} className="rounded-lg border border-red-400/30 px-3 py-2 text-xs text-red-200">Reset</button></div></div></>}
- {page==='Keuangan'&&<><PanelTitle icon={Coins} title="Keuangan klub" subtitle="Kelola kas, tiket, fasilitas, dan aset."/><div className="grid gap-3 sm:grid-cols-3">{stat('Kas klub',compact(game.clubCash),'Dana transfer/operasional',Banknote)}{stat('Uang pribadi',compact(game.personal),'Aset personal',Wallet)}{stat('Tiket pertandingan',money(game.ticket),'Harga tiket Liga 1',CalendarDays)}</div><div className="mt-4 rounded-2xl border border-white/[.07] bg-[#111713] p-5"><h3 className="font-bold">Pengembangan fasilitas · Level {game.facilities}/5</h3><p className="my-2 text-xs text-white/45">Upgrade fasilitas latihan.</p><button disabled={game.facilities>=5||game.clubCash<500000} onClick={()=>{update({facilities:game.facilities+1,clubCash:game.clubCash-500000});log('Fasilitas latihan ditingkatkan.')}} className="rounded-xl bg-lime-300 px-4 py-3 text-sm font-black text-black disabled:opacity-40">Upgrade · €500.000</button></div><p className="mt-4 text-xs text-white/40">Stadion: {club.stadium} · kapasitas tercatat {club.capacity.toLocaleString()} (perkiraan dataset).</p></>}
- </div><footer className="mx-auto max-w-[1250px] px-4 pb-8 text-[10px] text-white/25 sm:px-8">Touchline Career · data seed musim 2024/25 · simpan otomatis di perangkat ini</footer></main></div>
- {toast&&<div className="fixed bottom-5 left-1/2 z-50 -translate-x-1/2 rounded-xl border border-lime-300/20 bg-[#111713] px-4 py-3 text-sm shadow-xl">{toast}</div>}
- {match&&<div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4 backdrop-blur-sm"><div className="w-full max-w-lg rounded-2xl border border-white/10 bg-[#111713] p-5"><div className="flex items-center justify-between"><div><div className="text-[10px] uppercase tracking-widest text-lime-300">Live · menit {match.minute}'</div><h2 className="mt-2 text-xl font-black">{club.name} {match.homeScore} – {match.awayScore} {match.opponent.name}</h2></div><span className="animate-pulse text-lime-300">● LIVE</span></div><div className="my-5 max-h-[45vh] space-y-3 overflow-y-auto rounded-xl bg-black/20 p-4">{match.events.slice(-12).reverse().map((e,i)=><p key={`${e.minute}-${i}`} className={`text-sm ${e.goal?'font-bold text-lime-200':'text-white/65'}`}>{e.text}</p>)}</div><p className="text-xs text-white/35">Simulasi berjalan otomatis. Data peristiwa bersifat gameplay, bukan hasil pertandingan historis.</p></div></div>}
- {offer&&<div className="fixed inset-0 z-40 grid place-items-center bg-black/75 p-4"><div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#111713] p-5"><div className="flex justify-between"><h2 className="font-black">Negosiasi pemain</h2><button onClick={()=>setOffer(null)}><X/></button></div><p className="mt-2 text-sm text-white/50">{offer.player.name} · estimasi {eur(offer.player.marketValueEUR)}</p><label className="mt-4 block text-xs text-white/45">Tawaran (€)</label><input type="number" value={offer.price} onChange={e=>setOffer({...offer,price:Number(e.target.value)})} className="mt-2 w-full rounded-xl border border-white/10 bg-black/20 p-3"/><div className="mt-4 flex gap-2"><button onClick={()=>setOffer(null)} className="flex-1 rounded-xl border border-white/10 py-3 text-sm">Batal</button><button onClick={confirmSign} className="flex-1 rounded-xl bg-lime-300 py-3 text-sm font-black text-black">Ajukan</button></div></div></div>}
- </div>
+function readSave() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('footballclub-save') || '{}');
+    return { ...initialSave, ...saved };
+  } catch {
+    return { ...initialSave };
+  }
 }
+
+function formatMoney(value) {
+  return new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  }).format(value || 0);
+}
+
+export default function App() {
+  const [game, setGame] = useState(readSave);
+  const [toast, setToast] = useState('');
+
+  const club = clubs.find((c) => c.name === game.club) || clubs[0];
+  const team = useMemo(
+    () => players.filter((p) => game.squad.includes(p.id)),
+    [game.squad]
+  );
+
+  const leagueClubs = useMemo(
+    () => clubs.filter((c) => c.league === club.league),
+    [club.league]
+  );
+
+  const transferList = useMemo(
+    () => players.filter((p) => p.club !== club.name).slice(0, 8),
+    [club.name]
+  );
+
+  function notify(message) {
+    setToast(message);
+    setTimeout(() => setToast(''), 2200);
+  }
+
+  function playMatch() {
+    const rivals = leagueClubs.filter((c) => c.name !== club.name);
+    const rival = rivals[Math.floor(Math.random() * rivals.length)] || club;
+
+    const myRating = team.reduce((sum, player) => sum + (player.ovr || 70), 0) / Math.max(team.length, 1);
+    const rivalRating = players
+      .filter((p) => p.club === rival.name)
+      .reduce((sum, player) => sum + (player.ovr || 70), 0) / Math.max(players.filter((p) => p.club === rival.name).length, 1);
+
+    const myGoals = Math.random() < Math.max(0.2, (myRating - rivalRating + 20) / 120) ? 1 + Math.floor(Math.random() * 3) : 0;
+    const oppGoals = Math.random() < Math.max(0.2, (rivalRating - myRating + 20) / 120) ? 1 + Math.floor(Math.random() * 2) : 0;
+
+    setGame((prev) => ({
+      ...prev,
+      week: prev.week + 1,
+      cash: prev.cash + (myGoals > oppGoals ? 250000 : 50000),
+      rep: Math.min(100, prev.rep + (myGoals > oppGoals ? 5 : 1))
+    }));
+
+    notify(
+      `${club.name} ${myGoals}-${oppGoals} ${rival.name} (${myGoals > oppGoals ? 'Menang' : myGoals === oppGoals ? 'Seri' : 'Kalah'})`
+    );
+  }
+
+  function buyPlayer(player) {
+    const price = player.marketValueEUR || 500000;
+    if (price > game.cash) {
+      notify('Kas klub tidak cukup.');
+      return;
+    }
+
+    setGame((prev) => ({
+      ...prev,
+      cash: prev.cash - price,
+      squad: prev.squad.includes(player.id) ? prev.squad : [...prev.squad, player.id]
+    }));
+
+    notify(`${player.name} berhasil ditambahkan ke skuad.`);
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: 'linear-gradient(180deg, #07120b 0%, #0d1d16 100%)',
+      color: '#f5f7f5',
+      fontFamily: 'system-ui, sans-serif',
+      padding: '24px'
+    }}>
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <header style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: '16px',
+          marginBottom: '24px',
+          flexWrap: 'wrap'
+        }}>
+          <div>
+            <div style={{ fontSize: 12, letterSpacing: '1px', textTransform: 'uppercase', color: '#9ae6b4' }}>
+              Football Club Manager
+            </div>
+            <h1 style={{ margin: 0, fontSize: '2rem' }}>{club.name}</h1>
+          </div>
+
+          <div style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            fontSize: '14px'
+          }}>
+            <div style={{ background: '#112517', padding: '10px 14px', borderRadius: 12, border: '1px solid #1f3a2d' }}>
+              <strong>Kas:</strong> {formatMoney(game.cash)}
+            </div>
+            <div style={{ background: '#112517', padding: '10px 14px', borderRadius: 12, border: '1px solid #1f3a2d' }}>
+              <strong>Reputasi:</strong> {game.rep}
+            </div>
+            <div style={{ background: '#112517', padding: '10px 14px', borderRadius: 12, border: '1px solid #1f3a2d' }}>
+              <strong>Minggu:</strong> {game.week}
+            </div>
+          </div>
+        </header>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '24px' }}>
+          <section style={{
+            background: 'rgba(15, 23, 20, 0.9)',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+            borderRadius: '20px',
+            padding: '24px'
+          }}>
+            <h2 style={{ marginTop: 0 }}>Ringkasan</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '16px' }}>
+              <div style={{ background: '#0d1a14', borderRadius: 12, padding: '16px' }}>
+                <div style={{ color: '#95a5a6', fontSize: 12 }}>Liga</div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>{club.league}</div>
+              </div>
+              <div style={{ background: '#0d1a14', borderRadius: 12, padding: '16px' }}>
+                <div style={{ color: '#95a5a6', fontSize: 12 }}>Stadion</div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>{club.stadium}</div>
+              </div>
+            </div>
+
+            <button
+              onClick={playMatch}
+              style={{
+                marginTop: '20px',
+                width: '100%',
+                border: 'none',
+                borderRadius: '12px',
+                background: '#22c55e',
+                color: '#04130a',
+                fontWeight: 700,
+                fontSize: '16px',
+                padding: '14px',
+                cursor: 'pointer'
+              }}
+            >
+              Mainkan Pertandingan
+            </button>
+          </section>
+
+          <section style={{
+            background: 'rgba(15, 23, 20, 0.9)',
+            border: '1px solid rgba(148, 163, 184, 0.2)',
+            borderRadius: '20px',
+            padding: '24px'
+          }}>
+            <h2 style={{ marginTop: 0 }}>Skuad</h2>
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {team.map((player) => (
+                <div key={player.id} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  background: '#0d1a14',
+                  borderRadius: 12,
+                  padding: '10px 12px'
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{player.name}</div>
+                    <div style={{ color: '#a3b8af', fontSize: 12 }}>{player.position} • {player.club}</div>
+                  </div>
+                  <div style={{ fontWeight: 700, color: '#d9f99d' }}>{player.ovr}</div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+
+        <section style={{
+          marginTop: '24px',
+          background: 'rgba(15, 23, 20, 0.9)',
+          border: '1px solid rgba(148, 163, 184, 0.2)',
+          borderRadius: '20px',
+          padding: '24px'
+        }}>
+          <h2 style={{ marginTop: 0 }}>Transfer</h2>
+          <div style={{ display: 'grid', gap: '12px' }}>
+            {transferList.map((player) => (
+              <div key={player.id} style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: '#0d1a14',
+                borderRadius: '12px',
+                padding: '12px'
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700 }}>{player.name}</div>
+                  <div style={{ color: '#a3b8af', fontSize: 12 }}>{player.club}</div>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700 }}>{player.ovr}</div>
+                  <div style={{ color: '#a3b8af', fontSize: 12 }}>{player.marketValueEUR ? player.marketValueEUR.toLocaleString() : '0'}</div>
+                </div>
+                <button
+                  onClick={() => buyPlayer(player)}
+                  style={{
+                    border: 'none',
+                    borderRadius: 8,
+                    background: '#38bdf8',
+                    color: '#06141a',
+                    fontWeight: 700,
+                    padding: '8px 12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Beli
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <div style={{
+          position: 'fixed',
+          bottom: '20px',
+          right: '20px',
+          background: '#0f172a',
+          border: '1px solid rgba(148, 163, 184, 0.3)',
+          color: '#fff',
+          borderRadius: 12,
+          padding: '10px 14px',
+          opacity: toast ? 1 : 0,
+          transition: 'opacity 0.2s ease',
+          pointerEvents: toast ? 'auto' : 'none'
+        }}>
+          {toast}
+        </div>
+      </div>
+    </div>
+  );
+           }
