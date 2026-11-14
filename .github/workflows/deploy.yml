@@ -29,6 +29,11 @@ jobs:
         with:
           node-version: 20
 
+      # Generate the broadest real-club/player dataset available from the
+      # project's upstream 2024/25 source before bundling the browser game.
+      - name: Build season database
+        run: npm run database:build
+
       - name: Install dependencies
         run: npm install
 
