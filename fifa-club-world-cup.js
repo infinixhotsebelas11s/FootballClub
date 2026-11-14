@@ -1,8 +1,6 @@
 // Historical FIFA Club World Cup participants (2015–2023 and 2025 editions).
 // FIFA did not hold an edition in 2024. The 2025 tournament used the expanded
-// 32-team format. Historical participation is not a claim that every club in
-// each country's football pyramid is included. Clubs without curated metadata
-// use neutral placeholders for stadium/capacity/budget, not invented facts.
+// 32-team format. Historical participation is not a census of all world clubs.
 const slug = (value) => value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
 // name, country, domestic competition, editions played
@@ -53,15 +51,19 @@ const rows = [
   ['Boca Juniors','Argentina','Primera División',[2025]],
   ['Benfica','Portugal','Primeira Liga',[2025]],
   ['LAFC','United States','Major League Soccer',[2025]],
+  ['Inter Miami CF','United States','Major League Soccer',[2025]],
   ['Inter','Italy','Serie A',[2025]],
   ['Ulsan HD','South Korea','K League 1',[2025]],
   ['FC Porto','Portugal','Primeira Liga',[2025]],
   ['Borussia Dortmund','Germany','Bundesliga',[2025]],
   ['Juventus','Italy','Serie A',[2025]],
-  ['FC Salzburg','Austria','Austrian Bundesliga',[2025]]
+  ['FC Salzburg','Austria','Austrian Bundesliga',[2025]],
 ];
 
-export const fifaClubWorldCupLeagues = [...new Map(rows.map(([, country, name]) => [`${country}|${name}`, { country, name, divisions: 1, dataSource: 'Domestic league represented by FIFA Club World Cup participant records, editions 2015–2025' }])).values()];
+export const fifaClubWorldCupLeagues = [...new Map(rows.map(([, country, name]) => [
+  `${country}|${name}`,
+  { country, name, divisions: 1, dataSource: 'Domestic league represented by FIFA Club World Cup participant records, editions 2015–2025' },
+])).values()];
 
 export const fifaClubWorldCupClubs = rows.map(([name, country, league, editions]) => ({
   id: slug(name),
@@ -78,7 +80,9 @@ export const fifaClubWorldCupClubs = rows.map(([name, country, league, editions]
 
 export const fifaClubWorldCupMetadata = {
   editions: '2015–2023 and 2025',
-  note: 'FIFA Club World Cup was not held in 2024. The historic participant list is a focused add-on, not a complete worldwide club census. Validate historical edition records before commercial use.',
+  note: 'FIFA Club World Cup was not held in 2024. This focused historic participant list is not a complete worldwide club census.',
   participantCount: fifaClubWorldCupClubs.length,
   leagueCount: fifaClubWorldCupLeagues.length,
 };
+
+export const fifaClubWorldCupEditions = [...new Set(rows.flatMap(([, , , editions]) => editions))].sort((a, b) => a - b);
