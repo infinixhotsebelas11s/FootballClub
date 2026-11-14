@@ -4,7 +4,7 @@ Game manajer sepak bola berbasis teks, dibuat dengan React, Vite, dan Tailwind C
 
 ## Menjalankan secara lokal
 
-Butuh Node.js 18+ dan npm.
+Butuh Node.js 18+ dan Python 3.10+ untuk membangun dataset penuh.
 
 ```bash
 npm install
@@ -18,19 +18,31 @@ npm run build
 npm run preview
 ```
 
+## Mengimpor database musim 2024/25
+
+`database.js` memuat sampel terkurasi dan menggabungkannya dengan data hasil generator. Untuk mengunduh sumber publik dan menghasilkan catatan pemain/klub aktual yang memiliki penampilan liga pada periode musim tersebut:
+
+```bash
+npm run database:build
+```
+
+Generator standalone Python mengambil arsip publik dari [dcaribou/transfermarkt-datasets](https://github.com/dcaribou/transfermarkt-datasets), menyaring pertandingan tanggal 1 Juli 2024–30 Juni 2025, menghubungkan penampilan pemain dengan klub/kompetisi, dan menggunakan penilaian pasar bertanggal pada rentang itu. Hasil ditulis ke `database.generated.js`, yang digunakan otomatis oleh aplikasi. Unduhan besar pertama kali mungkin memerlukan waktu; arsip disimpan sementara di direktori temporary OS.
+
+### Batasan dan keakuratan
+
+- Ketersediaan hanya mencakup kompetisi dan penampilan yang ada di sumber upstream. Generator **tidak** mengisi semua 32 negara, tiga divisi penuh, atau memastikan target 100 klub/500 pemain sebelum hasil hitungan diperiksa.
+- Dataset upstream memiliki klub, pemain, DOB, posisi, nilai pasar, stadion, dan penampilan; beberapa metadata klub berasal dari snapshot yang lebih baru, bukan selalu nilai historis musim 2024/25.
+- Dataset tidak menyediakan rating EA FC, potensi, gaji mingguan, warna kit, atau anggaran transfer yang terverifikasi. OVR keluaran generator adalah **estimasi game dari nilai pasar**, bukan rating resmi. Potential/wage tidak tersedia dan ditandai demikian; anggaran dan warna kit tidak dikarang.
+- Jangan memperlakukan estimasi sebagai data faktual. Tinjau [lisensi repository upstream](https://github.com/dcaribou/transfermarkt-datasets/blob/master/LICENSE) dan ketentuan sumber asal sebelum redistribusi atau penggunaan komersial; atributkan sumber dan tanggal snapshot.
+- Liga/divisi tanpa data sumber tetap tidak terisi. Tidak ada klub atau pemain duplikat yang dibuat untuk memenuhi kuota.
+
 ## Fitur saat ini
 
-- Ringkasan karier, skuad, klasemen untuk klub yang ada pada sampel, taktik, database, transfer, karier, dan keuangan.
+- Ringkasan karier, skuad, klasemen untuk klub yang tersedia, taktik, database, transfer, karier, dan keuangan.
 - Simulasi teks live dengan menit pertandingan, peluang, gol, pencetak gol, dan hasil akhir.
 - Negosiasi pembelian pemain; pemilihan formasi, mentalitas, gaya main, dan latihan.
 - Autosave localStorage, ekspor/impor save JSON, dan reset save.
 - Tema gelap hitam-hijau neon dengan layout responsif.
-
-## Status dan batasan data
-
-`database.js` adalah **sampel data terkurasi musim 2024/25**, bukan dump lengkap. Ia belum berisi 100+ klub, 500+ pemain, daftar penuh 3 divisi untuk seluruh 32 kompetisi, jadwal historis lengkap, atau feed resmi EA SPORTS FC/Transfermarkt. Rating, nilai pasar, gaji, kapasitas, anggaran, dan kit perlu diverifikasi; jangan menganggap perkiraan game sebagai data resmi. Saya sengaja tidak membuat nama palsu atau menggandakan profil untuk memenuhi target hitungan.
-
-Untuk melengkapi database secara akurat, tambahkan dataset berlisensi/terverifikasi dan pertahankan sumber serta tanggal snapshot per record. Sampel ini tidak menyertakan lisensi nama, logo, atau atribut klub/pemain.
 
 ## Persistensi
 
