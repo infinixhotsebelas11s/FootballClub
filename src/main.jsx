@@ -5,6 +5,7 @@ import MatchStatsOverlay from './MatchStatsOverlay.jsx';
 import MyClubMenu from './MyClubMenu.jsx';
 import EntertainmentMenu from './EntertainmentMenu.jsx';
 import LeagueStatsMenu from './LeagueStatsMenu.jsx';
+import LeagueMatchdayResults from './LeagueMatchdayResults.jsx';
 import './index.css';
 
 createRoot(document.getElementById('root')).render(
@@ -14,6 +15,7 @@ createRoot(document.getElementById('root')).render(
       <LeagueStatsMenu />
       <MyClubMenu />
       <EntertainmentMenu />
+      <LeagueMatchdayResults />
       <MatchStatsOverlay />
     </>
   </React.StrictMode>,
