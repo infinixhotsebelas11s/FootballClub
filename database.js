@@ -1,9 +1,7 @@
 /*
- * Real-world 2024/25 season data plus historical FIFA Club World Cup participants
- * and a curated EFL lower-division list for England.
- * Generated season records come from scripts/build_database.py; tournament and
- * EFL add-ons supply focused clubs missing from that snapshot. This is not a
- * census of every club worldwide.
+ * Real-world 2024/25 season data plus historical FIFA Club World Cup participants,
+ * curated English EFL clubs, and European tier classification.
+ * This is not a census of every club or division in Europe.
  */
 import {
   generatedClubs,
@@ -20,6 +18,7 @@ import {
   englishLowerLeagueClubs,
   englishLowerLeagueCompetitions,
 } from './english-lower-leagues.js';
+import { getEuropeanDivision, europeanDivisionMetadata } from './european-divisions.js';
 
 const slug = (value) => String(value || '')
   .toLowerCase()
@@ -49,21 +48,30 @@ const curatedLeagueRows = [
 const leagueMap = new Map();
 for (const league of [...curatedLeagueRows, ...generatedLeagues, ...fifaClubWorldCupLeagues, ...englishLowerLeagueCompetitions]) {
   const key = `${String(league.country || '').toLowerCase()}|${String(league.name || '').toLowerCase()}`;
-  if (key !== '|') leagueMap.set(key, { ...(leagueMap.get(key) || {}), ...league });
+  if (key !== '|') {
+    const division = league.division ?? getEuropeanDivision(league.country, league.name);
+    leagueMap.set(key, {
+      ...(leagueMap.get(key) || {}),
+      ...league,
+      ...(division ? { division, divisions: Math.max(Number(league.divisions) || 1, division) } : {}),
+    });
+  }
 }
 export const leagues = [...leagueMap.values()];
 export const allLeagues = leagues;
 
-// Keep upstream season metadata where available, while allowing focused add-ons
-// to fill missing clubs and attach division/provenance fields.
+// Keep upstream season metadata where available; classify supported European tiers
+// from competition names when the source's tier field is absent.
 const clubMap = new Map();
 for (const club of [...generatedClubs, ...fifaClubWorldCupClubs, ...englishLowerLeagueClubs]) {
   const id = club.id || slug(club.name);
   const previous = clubMap.get(id) || {};
+  const division = club.division ?? getEuropeanDivision(club.country, club.league);
   clubMap.set(id, {
     ...previous,
     ...club,
     id,
+    ...(division ? { division, divisionSource: club.divisionSource || 'European competition-name tier mapping' } : {}),
     fifaClubWorldCupEditions: [
       ...new Set([
         ...(previous.fifaClubWorldCupEditions || []),
@@ -82,15 +90,17 @@ export const players = generatedPlayers;
 export const dataStatus = {
   season: '2024/25',
   completeness: generatedPlayers.length
-    ? 'generated season dataset plus historic FIFA Club World Cup entrants and curated 2024/25 English EFL clubs'
-    : 'historic FIFA Club World Cup entrants, curated English EFL clubs, and curated league list; run npm run database:build for season players and clubs',
+    ? 'generated season dataset plus historic FIFA Club World Cup entrants, curated English EFL clubs, and European tier classification'
+    : 'historic FIFA Club World Cup entrants, curated English EFL clubs, European competition tier mapping, and curated league list; run npm run database:build for season players and clubs',
   source: generatedMetadata.source || 'curated FIFA Club World Cup and English EFL records plus generated season dataset',
   generatedClubCount: generatedClubs.length,
   englishLowerLeagueClubCount: englishLowerLeagueClubs.length,
   englishLowerLeagueDivisions: 'EFL Championship, League One, League Two (2024/25)',
+  europeanDivisionMaximum: europeanDivisionMetadata.maximumSelectableDivision,
+  europeanDivisionCoverage: europeanDivisionMetadata.note,
   fifaClubWorldCupClubCount: fifaClubWorldCupClubs.length,
   fifaClubWorldCupEditions: fifaClubWorldCupMetadata.editions,
-  coverageNote: `${generatedMetadata.coverageNote || ''} Focused EFL addition covers England tiers 2–4 for 2024/25; it is not a complete worldwide census.`,
+  coverageNote: `${generatedMetadata.coverageNote || ''} European tiers are inferred from known competition names for competitions present in the source snapshot; coverage varies and is not exhaustive.`,
 };
 
 export const findClub = (name) => clubs.find(
@@ -113,7 +123,7 @@ export const databaseSummary = {
   totalLeagues: leagues.length,
   season: '2024/25',
   sampleMode: true,
-  notes: 'Season coverage is limited to upstream sources; English tiers 2–4 are a focused curated 2024/25 EFL addition, not every club worldwide.',
+  notes: 'European divisions are classified up to tier 4 when a league can be identified in the source data; not a complete European club census.',
 };
 
 export default {
